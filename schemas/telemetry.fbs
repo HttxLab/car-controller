@@ -1,0 +1,61 @@
+// Contains all the structs sent from the car to the client.
+namespace Telemetry;
+
+// Types of packets that can be sent from the server (car) to the client.
+union Payload {
+  State,
+  Hardware
+}
+
+// The master envelope wrapper for all data sent over an ephemeral QUIC stream.
+table Packet {
+  payload: Payload; 
+}
+
+// Represents a "frame" from one of the car's cameras.
+table Frame {
+  // The index/ID of the camera that captured this frame.
+  camera_id: uint;
+  
+  // The MJPEG-encoded frame from the camera.
+  frame: [ubyte];
+}
+
+// Represents a single, synchronized snapshot of the car's state at a point in time.
+table State {
+  timestamp: ulong = 0;
+
+  // An array of all frames captured from all cameras.
+  frames: [Frame];
+  
+  // If the data isn't on the wire, the pointer is simply null. This indicates that this frame is not intended as training data. 
+  inputs: Drive;
+}
+
+// Captures the exact actuator state/operator inputs echoed back by the hardware.
+table Drive {
+  steering_angle: float = 0.0; // Normalized from -1.0 to 1.0 (where 1.0 is all the way to the right).
+  throttle: float = 0.0;       // Normalized from 0.0 to 1.0.
+}
+
+// Low-frequency hardware health updates.
+table Hardware {
+  timestamp: ulong = 0;
+
+  // Main battery pack voltage (V).
+  battery_voltage: float = 0.0;
+
+  // Main battery current draw (A).
+  battery_amperes: float = 0.0;
+
+  // Current draw of the onboard computer / Raspberry Pi (A).
+  compute_amperes: float = 0.0;
+
+  // Overall CPU utilization (where 100% = one fully utilized core).
+  cpu_usage: float = 0.0;
+
+  // Memory currently in use by the OS/application (in megabytes).
+  ram_usage: uint = 0;
+}
+
+root_type Packet;
