@@ -1,6 +1,17 @@
 // Contains all the structs sent from the car to the client.
 namespace Telemetry;
 
+// Represents the physical mounting direction of a camera.
+enum Direction : ubyte {
+  Unknown = 0,       // Fallback for unmapped or new cameras
+  Forward = 1,       // Facing straight ahead
+  Backward = 2,      // Facing straight behind
+  ForwardRight = 3,  // Angled forward and to the right
+  ForwardLeft = 4,   // Angled forward and to the left
+  BackwardRight = 5, // Angled backward and to the right
+  BackwardLeft = 6   // Angled backward and to the left
+}
+
 // Types of packets that can be sent from the server (car) to the client.
 union Payload {
   State,
@@ -14,8 +25,8 @@ table Packet {
 
 // Represents a "frame" from one of the car's cameras.
 table Frame {
-  // The index/ID of the camera that captured this frame.
-  camera_id: uint;
+  // The direction the camera is facing.
+  direction: Direction = Unknown;
   
   // The MJPEG-encoded frame from the camera.
   frame: [ubyte];

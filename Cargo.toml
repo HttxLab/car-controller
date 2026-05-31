@@ -6,13 +6,14 @@ edition = "2024"
 [dependencies]
 # Logging
 simplelog = { version = "0.12.2", features = ["paris"] }
+colored = "3.1.1"
 
 # Error handling
 color-eyre = "0.6.5"
 
 # Configuration
 serde = { version = "1.0.228", features = ["derive"] }
-toml = "1.1.2+spec-1.1.0"
+toml = "1.1.2"
 
 # Async/Networking
 tokio = { version = "1.52.3", features = ["rt-multi-thread", "fs", "macros"] }
@@ -21,4 +22,4 @@ planus = "1.3.0"
 rcgen = "0.14.8"
 
 # Camera's
-nokhwa = "0.10.11"
+v4l = "0.14.0"
