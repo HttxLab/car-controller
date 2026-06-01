@@ -1,11 +1,12 @@
-use simplelog::{error, warn};
-use std::{
-    sync::{Arc, Weak},
-    thread::spawn,
-};
+use bytes::Bytes;
+use simplelog::warn;
+use std::sync::{Arc, Weak};
 
-use color_eyre::eyre::Result;
-use tokio::sync::watch::{Receiver, Sender, channel};
+use color_eyre::eyre::{Error, Result, eyre};
+use tokio::{
+    sync::watch::{Receiver, Sender, channel},
+    task::spawn_blocking,
+};
 use v4l::{
     Device, FourCC,
     buffer::Type,
@@ -15,34 +16,34 @@ use v4l::{
 
 use crate::quic::protocol::telemetry::Direction;
 
-pub type RawFrame = Arc<Vec<u8>>;
+pub type FrameResult = Result<Option<Bytes>, Arc<Error>>;
 
 pub struct CameraSettings {
     pub index: u16,
     pub width: u32,
     pub height: u32,
     pub rate: u8,
+    pub format: FourCC,
 }
 
 pub struct Camera {
     direction: Direction,
 
     guard: Arc<()>,
-    receiver: Receiver<Option<RawFrame>>,
+    receiver: Receiver<FrameResult>,
 }
 
 impl Camera {
     pub fn setup(settings: CameraSettings, direction: Direction) -> Camera {
         let guard = Arc::new(());
 
-        let (sender, receiver) = channel(None);
+        let (sender, receiver) = channel(Ok(None));
 
         {
             let weak: Weak<()> = Arc::downgrade(&guard);
-            spawn(move || {
-                if let Err(error) = Self::capture(weak, &settings, sender) {
-                    error!("Camera {} crashed:", &settings.index);
-                    error!("{:?}", error);
+            spawn_blocking(move || {
+                if let Err(error) = Self::capture(weak, &settings, &sender) {
+                    let _ = sender.send(Err(Arc::new(error)));
                 }
             });
         }
@@ -54,23 +55,29 @@ impl Camera {
         }
     }
 
-    pub async fn frame(&self) -> Option<RawFrame> {
-        self.receiver.borrow().clone()
+    pub fn latest_frame(&self) -> Result<Option<Bytes>> {
+        self.receiver
+            .borrow()
+            .clone()
+            .map_err(|error| eyre!("A capture error was detected: {:?}", error))
     }
 
     fn capture(
         flag: Weak<()>,
         settings: &CameraSettings,
-        sender: Sender<Option<RawFrame>>,
+        sender: &Sender<FrameResult>,
     ) -> Result<()> {
         let device = Device::with_path(format!("/dev/video{}", settings.index))?;
 
         let mut format = device.format()?;
         format.width = settings.width;
         format.height = settings.height;
-        format.fourcc = FourCC::new(b"MJPG");
+        format.fourcc = settings.format;
         if device.set_format(&format)?.fourcc != format.fourcc {
-            warn!("Camera {} did not accept the MJPEG format", settings.index);
+            warn!(
+                "Camera {} did not accept the {} format",
+                settings.index, settings.format
+            );
         }
 
         let mut parameters = device.params()?;
@@ -84,7 +91,10 @@ impl Camera {
             let (buffer, metadata) = stream.next()?;
             let payload = &buffer[..metadata.bytesused as usize];
 
-            if sender.send(Some(Arc::new(payload.to_vec()))).is_err() {
+            if sender
+                .send(Ok(Some(Bytes::copy_from_slice(payload))))
+                .is_err()
+            {
                 break;
             }
         }

@@ -2,6 +2,8 @@ use color_eyre::eyre::Result;
 use colored::Colorize;
 use simplelog::{ColorChoice, ConfigBuilder, LevelFilter, TermLogger, TerminalMode};
 
+use crate::application::version::Version;
+
 pub fn setup_logging() -> Result<()> {
     let mut config = ConfigBuilder::new();
     config.set_location_level(LevelFilter::Error);
@@ -15,7 +17,7 @@ pub fn setup_logging() -> Result<()> {
     Ok(())
 }
 
-pub fn print_ascii_art(application: &str, version: &str, authors: &[&str]) {
+pub fn print_ascii_art(application: &str, version: &Version, authors: &[&str]) {
     println!(
         "{}     {}",
         "  ___   __   ____".cyan(),
