@@ -36,17 +36,15 @@ pub struct Camera {
 impl Camera {
     pub fn setup(settings: CameraSettings, direction: Direction) -> Camera {
         let guard = Arc::new(());
+        let weak: Weak<()> = Arc::downgrade(&guard);
 
         let (sender, receiver) = channel(Ok(None));
 
-        {
-            let weak: Weak<()> = Arc::downgrade(&guard);
-            spawn_blocking(move || {
-                if let Err(error) = Self::capture(weak, &settings, &sender) {
-                    let _ = sender.send(Err(Arc::new(error)));
-                }
-            });
-        }
+        spawn_blocking(move || {
+            if let Err(error) = Self::capture(weak, &settings, &sender) {
+                let _ = sender.send(Err(Arc::new(error)));
+            }
+        });
 
         Self {
             direction,
